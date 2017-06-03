@@ -30,8 +30,7 @@ namespace Test
         {
             var data = new byte[] { 0xfe, 0x33, 0x17, 0x82 };
             var converted = Convert.Convert.ToBase64(data);
-            var system = System.Convert.ToBase64String(data);
-            Assert.AreEqual(system, converted);
+            Assert.AreEqual("/jMXgg==", converted);
         }
 
         [TestMethod]
@@ -39,8 +38,8 @@ namespace Test
         {
             var data = new byte[] { 0xfe, 0x33, 0x17, 0x82 };
             var converted = Convert.Convert.ToBase64Url(data);
-            var system = System.Convert.ToBase64String(data).Replace('.', '-').Replace('/', '_').Replace("=", string.Empty);
-            Assert.AreEqual(system, converted);
+
+            Assert.AreEqual("_jMXgg", converted);
         }
 
         [TestMethod]
@@ -61,6 +60,22 @@ namespace Test
 
             var converted = Convert.Convert.FromBase64Url(input);
             CollectionAssert.AreEqual(data, converted);
+        }
+
+        [TestMethod]
+        public void TestToHex()
+        {
+            var data = new byte[] { 0xfe, 0x33, 0x17, 0x82 };
+            var converted = Convert.Convert.ToHex(data);
+            Assert.AreEqual("fe331782", converted);
+        }
+
+
+        [TestMethod]
+        public void TestFromHex()
+        {
+            var data = new byte[] { 0xfe, 0x33, 0x17, 0x82 };
+            CollectionAssert.AreEqual(data, Convert.Convert.FromHex("fe331782"));
         }
     }
 }

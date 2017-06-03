@@ -23,20 +23,49 @@ namespace Convert
     using System;
     using System.Text;
 
+    /// <summary>
+    /// Defines conversions to / from base64 and base64url.
+    /// </summary>
     public static class Convert
     {
+        /// <summary>
+        /// Holds the base64 alphabet
+        /// </summary>
         private const string Base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+        /// <summary>
+        /// Holds the base64 URL alphabet
+        /// </summary>
         private const string Base64UrlAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-        private const int ErrorPosition = -1;
+        /// <summary>
+        /// Holds the hex alphabet
+        /// </summary>
+        private const string HexAlphabet = "0123456789abcdef";
 
+        /// <summary>
+        /// Holds the reverse map for base64
+        /// </summary>
         private static readonly int[] Base64AlphabetReverse;
 
+        /// <summary>
+        /// Holds the reverse map for base64 url
+        /// </summary>
         private static readonly int[] Base64UrlAlphabetReverse;
 
-        private const string Base62Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        /// <summary>
+        /// Holds the reverse map for base64 url
+        /// </summary>
+        private static readonly int[] HexAlphabetReverse;
 
+        /// <summary>
+        /// Constant for the error position in the reverse maps.
+        /// </summary>
+        private const int ErrorPosition = -1;
+
+        /// <summary>
+        /// Initializes the reverse maps.
+        /// </summary>
         static Convert()
         {
             Base64AlphabetReverse = new int[128];
@@ -64,10 +93,32 @@ namespace Convert
             {
                 Base64UrlAlphabetReverse[Base64UrlAlphabet[i]] = i;
             }
+
+            HexAlphabetReverse = new int[128];
+
+            for (var i = 0; i < HexAlphabetReverse.Length; ++i)
+            {
+                HexAlphabetReverse[i] = ErrorPosition;
+            }
+
+            for (var i = 0; i < HexAlphabet.Length; ++i)
+            {
+                HexAlphabetReverse[HexAlphabet[i]] = i;
+            }
         }
 
+        /// <summary>
+        /// Converts the input byte array to base64.
+        /// </summary>
+        /// <param name="input">The input base64 array.</param>
+        /// <returns>A base64 encoded string of the input array.</returns>
         public static string ToBase64(byte[] input) => ToBase64(input, Base64Alphabet, '=');
 
+        /// <summary>
+        /// Converts the input base64 string to a byte array.
+        /// </summary>
+        /// <param name="input">The input base64 string.</param>
+        /// <returns>A byte array.</returns>
         public static byte[] FromBase64(string input)
         {
             if (input.Length % 4 != 0)
@@ -78,34 +129,120 @@ namespace Convert
             return FromBase64(input, Base64AlphabetReverse, '=');
         }
 
+        /// <summary>
+        /// Converts the input byte array to base64 url encoding.
+        /// </summary>
+        /// <param name="input">The input base64 array.</param>
+        /// <returns>A base64 encoded string of the input array.</returns>
         public static string ToBase64Url(byte[] input) => ToBase64(input, Base64UrlAlphabet, (char)0);
 
+        /// <summary>
+        /// Converts the input base64 url string to a byte array.
+        /// </summary>
+        /// <param name="input">The input base64 url string.</param>
+        /// <returns>A byte array.</returns>
         public static byte[] FromBase64Url(string input) => FromBase64(input, Base64UrlAlphabetReverse, (char)0);
 
+        /// <summary>
+        /// Converts to hex.
+        /// </summary>
+        /// <param name="input">The input byte array.</param>
+        /// <returns>A base64 encoded string.</returns>
+        public static string ToHex(byte[] input)
+        {
+            var sb = new StringBuilder();
+            var inputLength = input.Length;
+
+            for (var inputRun = 0; inputRun < inputLength;)
+            {
+                var data = input[inputRun++];
+                sb.Append(HexAlphabet[data >> 4]);
+                sb.Append(HexAlphabet[data & 15]);
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Converts from hex.
+        /// </summary>
+        /// <param name="input">The input encoded string.</param>
+        /// <returns>A byte array of the encoded input.</returns>
+        public static byte[] FromHex(string input)
+        {
+            var inputLength = input.Length;
+
+            if (inputLength % 2 != 0)
+            {
+                throw new ArgumentException("Bad input", nameof(input));
+            }
+
+            var outputLength = inputLength / 2;
+
+            var result = new byte[outputLength];
+            var outputPosition = 0;
+
+            for (var inputPosition = 0; inputPosition < inputLength;)
+            {
+                var oneByte = 0;
+
+                for (var inputRun = 0; inputRun < 2; ++inputRun)
+                {
+                    var ch = input[inputPosition++];
+                    if (ch > 128)
+                    {
+                        throw new ArgumentException("Bad input string", nameof(input));
+                    }
+
+                    var mapped = HexAlphabetReverse[ch];
+
+                    if (mapped == ErrorPosition)
+                    {
+                        throw new ArgumentException("Bad input string", nameof(input));
+                    }
+
+                    oneByte = mapped + (oneByte << 4);
+                }
+
+                result[outputPosition++] = (byte)oneByte;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Converts to base64.
+        /// </summary>
+        /// <param name="input">The input byte array.</param>
+        /// <param name="alphabet">The conversion alphabet.</param>
+        /// <param name="pad">The padding character. 0 if no padding.</param>
+        /// <returns>A base64 encoded string.</returns>
         private static string ToBase64(byte[] input, string alphabet, char pad)
         {
             var sb = new StringBuilder();
-            var l = input.Length;
-            var bits = l * 8;
+            var inputLength = input.Length;
+            var inputBits = inputLength * 8;
 
-            for (var i = 0; i < l;)
+            for (var inputRun = 0; inputRun < inputLength;)
             {
-                var data = input[i++] << 16;
-                if (i < l)
+                var data = input[inputRun++] << 16;
+
+                if (inputRun < inputLength)
                 {
-                    data += input[i++] << 8;
-                    if (i < l)
+                    data += input[inputRun++] << 8;
+                    if (inputRun < inputLength)
                     {
-                        data += input[i++];
+                        data += input[inputRun++];
                     }
                 }
+
                 for (var o = 0; o < 4; ++o)
                 {
-                    if (bits > 0)
+                    if (inputBits > 0)
                     {
                         sb.Append(alphabet[(data >> 18) & 63]);
                         data = data << 6;
-                        bits -= 6;
+                        inputBits -= 6;
                     }
                     else if (pad != 0)
                     {
@@ -117,7 +254,14 @@ namespace Convert
             return sb.ToString();
         }
 
-        private static byte[] FromBase64(string input, int[] alphabet, char pad)
+        /// <summary>
+        /// Converts from base64.
+        /// </summary>
+        /// <param name="input">The input encoded string.</param>
+        /// <param name="reverseAlphabet">The reverse alphabet.</param>
+        /// <param name="pad">The padding character. 0 if no padding.</param>
+        /// <returns>A byte array of the encoded input.</returns>
+        private static byte[] FromBase64(string input, int[] reverseAlphabet, char pad)
         {
             var inputLength = input.Length;
 
@@ -140,6 +284,7 @@ namespace Convert
                 for (var inputRun = 0; inputRun < 4; ++inputRun)
                 {
                     var mapped = 0;
+
                     if (inputPosition < inputLength)
                     {
                         var ch = input[inputPosition++];
@@ -147,7 +292,8 @@ namespace Convert
                         {
                             throw new ArgumentException("Bad input string", nameof(input));
                         }
-                        mapped = alphabet[ch];
+
+                        mapped = reverseAlphabet[ch];
 
                         if (mapped == ErrorPosition)
                         {
